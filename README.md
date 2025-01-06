@@ -1,4 +1,4 @@
-This project aims to study Conditional Adversarial Networks for Image to Image Translation and Image Generation tasks. It is based on the results from the paper: P. Isola, J.-Y. Zhu, T. Zhou, and A. A. Efros. Image-to-image translation with conditional
+This project aims to study Conditional Adversarial Networks for Image to Image Translation and Image Generation tasks. It is based on the results of the paper: P. Isola, J.-Y. Zhu, T. Zhou, and A. A. Efros. Image-to-image translation with conditional
 adversarial networks. In Proceedings of the IEEE conference on computer vision and pattern
 recognition, pages 1125–1134, 2017.
 
