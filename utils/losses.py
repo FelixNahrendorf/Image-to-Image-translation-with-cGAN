@@ -74,13 +74,19 @@ class GANLosses:
         return loss_G
 
     def discriminator_loss(self, discriminator, real_B, fake_B, condition):
+        """Calculate the discriminator loss."""
+        # Real loss
         pred_real = discriminator(real_B, condition)
         loss_D_real = self.gan_loss(pred_real, True)
         
+        # Fake loss - create new tensor for fake predictions
         pred_fake = discriminator(fake_B.detach(), condition)
         loss_D_fake = self.gan_loss(pred_fake, False)
         
+        # Gradient penalty
         gp = self.gradient_penalty(discriminator, real_B, fake_B, condition)
         
+        # Combine losses without in-place operations
         loss_D = (loss_D_real + loss_D_fake) * 0.5 + self.lambda_gp * gp
+        
         return loss_D

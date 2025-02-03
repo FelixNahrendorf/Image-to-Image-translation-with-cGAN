@@ -11,3 +11,5 @@ pyyaml
 scikit-image
 matplotlib
 seaborn
+captum
+opencv-python

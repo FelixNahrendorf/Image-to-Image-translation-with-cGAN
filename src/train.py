@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from utils.helper_functions import load_config
 from data.dataset import CustomDataset
-from src.model import UNetGenerator, PatchGANDiscriminator
+from src.model import UNetGenerator, PatchGANDiscriminator, initialize_weights
 from utils.losses import GANLosses
 from utils.early_stopping import EarlyStopping
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -39,12 +39,14 @@ def train_model(config):
         is_training=False
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=config['training']['batch_size'], shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=config['training']['batch_size'], shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=config['current_training']['batch_size'], shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config['current_training']['batch_size'], shuffle=False)
 
     # Initialize generator and discriminator
     generator = UNetGenerator(dropout_rate=0.5)
+    generator.apply(initialize_weights)
     discriminator = PatchGANDiscriminator()
+    discriminator.apply(initialize_weights)
 
     # Set up device for training
     device = torch.device("cuda" if config['device']['use_gpu'] and torch.cuda.is_available() else "cpu")
@@ -52,15 +54,20 @@ def train_model(config):
     discriminator.to(device)
 
     # Initialize optimizers and schedulers
-    optimizer_G = torch.optim.Adam(generator.parameters(), lr=config['training']['lr'], betas=(0.5, 0.999))
-    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=config['training']['lr'], betas=(0.5, 0.999))
+    optimizer_G = torch.optim.Adam(generator.parameters(), lr=config['current_training']['lr'], betas=(0.5, 0.999))
+    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=config['current_training']['lr'], betas=(0.5, 0.999))
+
+    # Get scheduler values from config
+    s_factor = config['training']['scheduler'].get('factor', 0.5)
+    s_patience = config['training']['scheduler'].get('factor', 5)
+    s_min_lr = config['training']['scheduler'].get('min_lr', 0.00001)
 
     # Initialize learning rate schedulers
-    scheduler_G = ReduceLROnPlateau(optimizer_G, mode='min', factor=0.5, patience=5, verbose=True)
-    scheduler_D = ReduceLROnPlateau(optimizer_D, mode='min', factor=0.5, patience=5, verbose=True)
+    scheduler_G = ReduceLROnPlateau(optimizer_G, mode='min', factor=s_factor, patience=s_patience, verbose=True, min_lr=s_min_lr)
+    scheduler_D = ReduceLROnPlateau(optimizer_D, mode='min', factor=s_factor, patience=s_patience, verbose=True, min_lr=s_min_lr)
 
     # Initialize loss functions
-    losses = GANLosses(lambda_L1=config['training']['lambda_L1'], gan_mode='vanilla')
+    losses = GANLosses(lambda_L1=config['current_training']['lambda_L1'], gan_mode='vanilla')
 
     # Get max_grad_norm from config
     max_grad_norm = config['training'].get('max_grad_norm', 1.0)
@@ -71,6 +78,10 @@ def train_model(config):
         min_delta=config['training'].get('early_stopping_min_delta', 0.0),
         verbose=True
     )
+
+    # Current model as string
+    current_model = f"lr{config['current_training']['lr']}_bs{config['current_training']['batch_size']}_lambda{config['current_training']['lambda_L1']}"
+    os.makedirs(f"{config['logging']['checkpoint_dir']}/{current_model}", exist_ok=True)
 
     # Training loop
     for epoch in range(config['training']['start_epoch'], config['training']['epochs'] + 1):
@@ -113,18 +124,18 @@ def train_model(config):
             optimizer_D.step()
 
             # Log losses at specified intervals
-            if i % config['logging']['log_interval'] == 0:
-                print(f"Step [{i}/{len(train_loader)}]: Generator Loss - {loss_G.item():.4f}, Discriminator Loss - {loss_D.item():.4f}")
+            if (i+1) % config['logging']['log_interval'] == 0:
+                print(f"Step [{i+1}/{len(train_loader)}]: Generator Loss - {loss_G.item():.4f}, Discriminator Loss - {loss_D.item():.4f}")
 
         # Save model checkpoints at specified intervals
         if epoch % config['logging']['checkpoint_interval'] == 0:
             print(f"Saving model at epoch {epoch}")
-            torch.save(generator.state_dict(), f"{config['logging']['checkpoint_dir']}/generator_epoch_{epoch}.pth")
-            torch.save(discriminator.state_dict(), f"{config['logging']['checkpoint_dir']}/discriminator_epoch_{epoch}.pth")
+            torch.save(generator.state_dict(), f"{config['logging']['checkpoint_dir']}/{current_model}/generator_epoch_{epoch}.pth")
+            torch.save(discriminator.state_dict(), f"{config['logging']['checkpoint_dir']}/{current_model}/discriminator_epoch_{epoch}.pth")
 
         # Validation phase
         if epoch % config['logging']['validation_interval'] == 0:
-            val_loss, metrics = validate_model(generator, val_loader, device, losses, epoch, config)
+            val_loss, metrics = validate_model(generator, val_loader, device, losses, epoch, config, current_model)
             
             # Update learning rates based on validation loss
             scheduler_G.step(val_loss)
@@ -138,14 +149,14 @@ def train_model(config):
 
     # Save the final model
     print("Saving final model...")
-    torch.save(generator.state_dict(), f"{config['logging']['checkpoint_dir']}/generator_latest.pth")
-    torch.save(discriminator.state_dict(), f"{config['logging']['checkpoint_dir']}/discriminator_latest.pth")
+    torch.save(generator.state_dict(), f"{config['logging']['checkpoint_dir']}/{current_model}/generator_latest.pth")
+    torch.save(discriminator.state_dict(), f"{config['logging']['checkpoint_dir']}/{current_model}/discriminator_latest.pth")
     print("Training complete.")
     
-    return generator
+    return generator, discriminator
 
 
-def validate_model(generator, val_loader, device, losses, epoch, config):
+def validate_model(generator, val_loader, device, losses, epoch, config, current_model):
     generator.eval()
     total_l1_loss = 0
     total_ssim = 0
@@ -168,8 +179,8 @@ def validate_model(generator, val_loader, device, losses, epoch, config):
             num_samples += 1
             
             # Save sample validation images periodically
-            if i == 0:  # Save first batch
-                save_validation_samples(real_A, real_B, fake_B, epoch, config['logging']['checkpoint_dir'])
+            if i == 0 and epoch % config['logging']['val_samples_interval'] == 0:  # Save first batch
+                save_validation_samples(real_A, real_B, fake_B, epoch, f"{config['logging']['checkpoint_dir']}/{current_model}")
     
     metrics = {
         'l1_loss': total_l1_loss / num_samples,
@@ -207,11 +218,22 @@ def save_validation_samples(real_A, real_B, fake_B, epoch, save_dir):
     # Save the image
     vutils.save_image(
         comparison,
-        os.path.join(save_dir, 'validation_samples', f'epoch_{epoch}.png'),
+        os.path.join(save_dir, 'validation_samples', f'epoch_{epoch:03d}.png'),
         normalize=True
     )
 
 
 if __name__ == "__main__":
     config = load_config()
+
+    # Choose parameters
+    learning_rate = 0.0003
+    batch_size = 8
+    lambda_l1 = 10
+
+    config['current_training'] = {}
+    config['current_training']['lr'] = learning_rate
+    config['current_training']['batch_size'] = batch_size
+    config['current_training']['lambda_L1'] = lambda_l1
+
     train_model(config)

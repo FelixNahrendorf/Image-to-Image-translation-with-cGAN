@@ -21,7 +21,8 @@ def test_model(config):
     """
     # Load the generator model
     generator = UNetGenerator()
-    checkpoint_path = os.path.join(config['logging']['checkpoint_dir'], "generator_latest.pth")
+    current_model = f"lr{config['current_training']['lr']}_bs{config['current_training']['batch_size']}_lambda{config['current_training']['lambda_L1']}"
+    checkpoint_path = os.path.join(config['logging']['checkpoint_dir'], f"{current_model}/generator_latest.pth")
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
     
@@ -37,7 +38,8 @@ def test_model(config):
     test_dataset = CustomDataset(
         images_dir=config['data']['test_images_dir'],
         labels_dir=config['data']['test_labels_dir'],
-        transform=transforms.Compose([transforms.Resize((256, 256)), transforms.ToTensor()])
+        transform=transforms.Compose([transforms.Resize((256, 256)), transforms.ToTensor()]),
+        is_training=False
     )
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
@@ -58,7 +60,7 @@ def test_model(config):
     print(f"Testing complete. Processed {len(predictions)} samples.")
     return predictions
 
-def save_test_samples(real_A, real_B, fake_B, number, save_dir):
+def save_test_samples(real_A, real_B, fake_B, number, save_dir, save_separately=False):
     """
     Save test sample images.
     
@@ -74,29 +76,53 @@ def save_test_samples(real_A, real_B, fake_B, number, save_dir):
     # Create directory if it doesn't exist
     os.makedirs(save_dir, exist_ok=True)
     
+    if save_separately:
+        os.makedirs(f"{save_dir}/0", exist_ok=True)
+        os.makedirs(f"{save_dir}/1", exist_ok=True)
+        os.makedirs(f"{save_dir}/2", exist_ok=True)
+        for i, image in enumerate((real_A, real_B, fake_B)):
+            # Save the image
+            vutils.save_image(
+                image,
+                os.path.join(save_dir, f"{i}/image_{number:03d}.png"),
+                normalize=True
+            )
+
+    else:
     # Concatenate the images horizontally
-    comparison = torch.cat([real_A, real_B, fake_B], dim=3)
-    
-    # Save the image
-    vutils.save_image(
-        comparison,
-        os.path.join(save_dir, f'image_{number}.png'),
-        normalize=True
-    )
+        comparison = torch.cat([real_A, real_B, fake_B], dim=3)
+        
+        # Save the image
+        vutils.save_image(
+            comparison,
+            os.path.join(save_dir, f'image_{number:03d}.png'),
+            normalize=True
+        )
 
 if __name__ == "__main__":
 
     # Load configuration
     config_path = "config.yaml"
     config = load_config(config_path)
+    save_separately = True
+
+    # Choose model
+    learning_rate = 0.0001
+    batch_size = 8
+    lambda_l1 = 10
+
+    config['current_training'] = {}
+    config['current_training']['lr'] = learning_rate
+    config['current_training']['batch_size'] = batch_size
+    config['current_training']['lambda_L1'] = lambda_l1
 
     # Define storage directory
-    save_dir = "validation/test1"
+    save_dir = "validation/test_prototyp21"
 
     # Test the model
     predictions = test_model(config)
 
     # Save predictions or perform any other processing as needed
     for i, prediction in enumerate(predictions):
-        save_test_samples(*prediction, i+1, save_dir)
+        save_test_samples(*prediction, i+1, save_dir, save_separately)
     print(f"Generated {len(predictions)} images.")

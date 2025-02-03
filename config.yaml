@@ -1,32 +1,37 @@
 training:
-  batch_size: 8       # Example value
+  learning_rates: [0.0003]  # Learning rate for Adam optimizer
+  batch_sizes: [8]    # Example values
+  lambda_L1: [10]      # Example values for L1 regularization weight
+  
   epochs: 200        # Example value
   start_epoch: 1       # Example value
-  lambda_L1: 10.0      # Example value for L1 regularization weight
-  lr: 0.0003           # Learning rate for Adam optimizer
-  checkpoint_interval: 20  # How often to save checkpoints
+  
   max_grad_norm: 1.0  # Add this line
-  early_stopping_patience: 7    # Add this line
+  early_stopping_patience: 20    # Add this line
   early_stopping_min_delta: 0.0 # Add this line
   scheduler:
     factor: 0.5      # Learning rate reduction factor
     patience: 5      # Number of epochs to wait before reducing LR
-    min_lr: 0.00001  # Minimum learning rate
+    min_lr: 0.000005  # Minimum learning rate
 
+# 1: CMP Facade Database; change number for potential other datasets
+dataset: 1
 
 data:
-  train_images_dir: "data/processed/train/images"
-  train_labels_dir: "data/processed/train/labels"
-  test_images_dir: "data/processed/test/images"
-  test_labels_dir: "data/processed/test/labels"
-  val_images_dir: "data/processed/val/images"
-  val_labels_dir: "data/processed/val/labels"
+  datasets_dir: "data/dataset_"
+  train_images_dir: "processed/train/images"
+  train_labels_dir: "processed/train/labels"
+  test_images_dir: "processed/test/images"
+  test_labels_dir: "processed/test/labels"
+  val_images_dir: "processed/val/images"
+  val_labels_dir: "processed/val/labels"
 
 logging:
   log_interval: 10                 # Log frequency (in steps)
-  checkpoint_interval: 5           # Frequency of saving model checkpoints
-  validation_interval: 1 
-  checkpoint_dir: "checkpoints/prototyp"
+  checkpoint_interval: 20           # Frequency of saving model checkpoints
+  validation_interval: 1
+  val_samples_interval: 10
+  checkpoint_dir: "checkpoints/prototyp1"
 
 device:
   use_gpu: true                    # Enable GPU usage if available

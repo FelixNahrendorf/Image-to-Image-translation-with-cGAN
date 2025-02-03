@@ -7,7 +7,7 @@ import torch
 import matplotlib.pyplot as plt
 from torchvision.utils import make_grid
 
-def show(image_label_pair, dataset, outfile=None, title_col_left="Image", title_col_right="Label"):
+def show(image_label_pair, dataset, outfile=None, title_col_left="Label", title_col_right="Image"):
     '''dataset need to be instance from class CustomDataset'''
 
     batch = []
@@ -31,12 +31,14 @@ def show(image_label_pair, dataset, outfile=None, title_col_left="Image", title_
 
     return 
 
-# Get images and associated labels from training dataset
-config = load_config()
-dataset_to_show = CustomDataset(
-    images_dir=config['data']['train_images_dir'],
-    labels_dir=config['data']['train_labels_dir'])
+if __name__ == "__main__":
+    # Get images and associated labels from training dataset
+    config = load_config()
+    dataset_to_show = CustomDataset(
+        images_dir=config['data']['train_images_dir'],
+        labels_dir=config['data']['train_labels_dir'],
+        is_training=False)
 
-# Show pairs of images and associated labels
-images_to_show = [1,3,10,23]
-show(images_to_show, dataset_to_show)
+    # Show pairs of images and associated labels
+    images_to_show = [1,3,10,23]
+    show(images_to_show, dataset_to_show)

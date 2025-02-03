@@ -44,6 +44,9 @@ class CustomDataset(Dataset):
             if self.transform:
                 image = self.transform(image)
                 label = self.transform(label)
+            else:
+                image = transforms.ToTensor()(image)
+                label = transforms.ToTensor()(label)
 
         return {"B": image, "A": label}
 

@@ -1,0 +1,14 @@
+{
+    "Performance Metrics": {
+        "SSIM": 0.7651044726371765,
+        "MSE": 0.02153589022408384,
+        "Average Confidence": 0.5027815490137254
+    },
+    "Timing Information": {
+        "Average Inference Time": 0.07372197767171522,
+        "Total Evaluation Time": 60.378299713134766
+    },
+    "Dataset Information": {
+        "Test Set Size": 819
+    }
+}
